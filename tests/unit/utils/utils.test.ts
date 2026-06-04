@@ -650,6 +650,59 @@ describe('utils.ts', () => {
         expect(findClaudeCLIPath()).toBe(expectedPath);
       });
 
+      it('should find native claude.exe inside npm node_modules (no cli.js)', () => {
+        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
+        const nativeBin = path.join(
+          'C:\\Users\\test', 'AppData', 'Roaming', 'npm',
+          'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'
+        );
+        mockExistingFile(nativeBin);
+
+        expect(findClaudeCLIPath()).toBe(nativeBin);
+      });
+
+      it('should prefer native npm bin/claude.exe over cli.js', () => {
+        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
+        const nativeBin = path.join(
+          'C:\\Users\\test', 'AppData', 'Roaming', 'npm',
+          'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'
+        );
+        const cliJsPath = path.join(
+          'C:\\Users\\test', 'AppData', 'Roaming', 'npm',
+          'node_modules', '@anthropic-ai', 'claude-code', 'cli.js'
+        );
+        mockExistingFile(nativeBin, cliJsPath);
+
+        expect(findClaudeCLIPath()).toBe(nativeBin);
+      });
+
+      it('should not return the extensionless claude shim on PATH, prefer native bin', () => {
+        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
+        const npmDir = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm');
+        const shim = path.join(npmDir, 'claude'); // POSIX shell script, not spawnable
+        const nativeBin = path.join(
+          npmDir, 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe'
+        );
+        process.env.PATH = npmDir;
+        // Both the bad shim and the real native binary exist on disk.
+        mockExistingFile(shim, nativeBin);
+
+        const result = findClaudeCLIPath();
+        expect(result).toBe(nativeBin);
+        expect(result).not.toBe(shim);
+      });
+
+      it('should not return the extensionless claude shim when only the shim exists', () => {
+        jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
+        const npmDir = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm');
+        const shim = path.join(npmDir, 'claude');
+        process.env.PATH = npmDir;
+        mockExistingFile(shim);
+
+        // The shim alone is unusable on Windows -> null, not the shim path.
+        expect(findClaudeCLIPath()).toBeNull();
+      });
+
       it('should ignore .cmd fallback on Windows', () => {
         jest.spyOn(os, 'homedir').mockReturnValue('C:\\Users\\test');
         const expectedPath = path.join('C:\\Users\\test', 'AppData', 'Roaming', 'npm', 'claude.cmd');

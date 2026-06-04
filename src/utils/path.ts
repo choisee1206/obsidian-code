@@ -203,6 +203,41 @@ function resolveCliJsNearPathEntry(entry: string, isWindows: boolean): string | 
   return null;
 }
 
+/**
+ * Resolves the native `claude.exe` shipped inside npm's node_modules relative
+ * to a single PATH entry. Handles both the npm-global dir itself (which holds
+ * `node_modules/...`) and a `<prefix>/bin` entry. Windows-only.
+ */
+function resolveNativeBinNearPathEntry(entry: string): string | null {
+  const toBin = (prefix: string) =>
+    path.join(prefix, 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+
+  const directCandidate = toBin(entry);
+  if (isExistingFile(directCandidate)) {
+    return directCandidate;
+  }
+
+  const baseName = path.basename(entry).toLowerCase();
+  if (baseName === 'bin') {
+    const candidate = toBin(path.dirname(entry));
+    if (isExistingFile(candidate)) {
+      return candidate;
+    }
+  }
+
+  return null;
+}
+
+function resolveNativeBinFromPathEntries(entries: string[]): string | null {
+  for (const entry of entries) {
+    const candidate = resolveNativeBinNearPathEntry(entry);
+    if (candidate) {
+      return candidate;
+    }
+  }
+  return null;
+}
+
 function resolveCliJsFromPathEntries(entries: string[], isWindows: boolean): string | null {
   for (const entry of entries) {
     const candidate = resolveCliJsNearPathEntry(entry, isWindows);
@@ -226,9 +261,18 @@ function resolveClaudeFromPathEntries(
     return unixCandidate;
   }
 
-  const exeCandidate = findFirstExistingPath(entries, ['claude.exe', 'claude']);
+  // On Windows, only accept the native `claude.exe`. The extensionless `claude`
+  // file on PATH is a POSIX shell script (npm shim) that cannot be spawned
+  // directly and causes ENOENT, so it must never be returned.
+  const exeCandidate = findFirstExistingPath(entries, ['claude.exe']);
   if (exeCandidate) {
     return exeCandidate;
+  }
+
+  // Native binary shipped inside npm's node_modules (modern npm installs).
+  const nativeBinCandidate = resolveNativeBinFromPathEntries(entries);
+  if (nativeBinCandidate) {
+    return nativeBinCandidate;
   }
 
   const cliJsCandidate = resolveCliJsFromPathEntries(entries, isWindows);
@@ -319,6 +363,40 @@ function getNpmCliJsPaths(): string[] {
   return cliJsPaths;
 }
 
+/**
+ * Builds the list of paths to search for the native `claude.exe` shipped
+ * inside npm's node_modules (modern @anthropic-ai/claude-code installs ship a
+ * native binary at `node_modules/@anthropic-ai/claude-code/bin/claude.exe`
+ * instead of a `cli.js` entry point). Windows-only.
+ */
+function getNpmNativeBinPaths(): string[] {
+  const homeDir = os.homedir();
+  const binPaths: string[] = [];
+
+  const toBin = (prefix: string) =>
+    path.join(prefix, 'node_modules', '@anthropic-ai', 'claude-code', 'bin', 'claude.exe');
+
+  // Default npm global prefix on Windows
+  binPaths.push(toBin(path.join(homeDir, 'AppData', 'Roaming', 'npm')));
+
+  // npm prefix from environment/config
+  const npmPrefix = getNpmGlobalPrefix();
+  if (npmPrefix) {
+    binPaths.push(toBin(npmPrefix));
+  }
+
+  // Common custom npm global directories on Windows
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
+  binPaths.push(
+    toBin(path.join(programFiles, 'nodejs', 'node_global')),
+    toBin(path.join(programFilesX86, 'nodejs', 'node_global')),
+    toBin(path.join('D:', 'Program Files', 'nodejs', 'node_global'))
+  );
+
+  return binPaths;
+}
+
 /** Finds Claude Code CLI executable from PATH or common install locations. */
 export function findClaudeCLIPath(pathValue?: string): string | null {
   const homeDir = os.homedir();
@@ -345,6 +423,15 @@ export function findClaudeCLIPath(pathValue?: string): string | null {
     ];
 
     for (const p of exePaths) {
+      if (isExistingFile(p)) {
+        return p;
+      }
+    }
+
+    // Native binary shipped inside npm's node_modules (modern npm installs ship
+    // bin/claude.exe instead of cli.js). Preferred over cli.js.
+    const npmNativeBinPaths = getNpmNativeBinPaths();
+    for (const p of npmNativeBinPaths) {
       if (isExistingFile(p)) {
         return p;
       }
