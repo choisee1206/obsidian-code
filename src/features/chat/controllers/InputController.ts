@@ -6,7 +6,7 @@
  */
 
 import type { Component } from 'obsidian';
-import { Notice } from 'obsidian';
+import { Notice, TFile } from 'obsidian';
 
 import type { ExitPlanModeDecision } from '../../../core/agent/ObsidianCodeService';
 import type { SlashCommandManager } from '../../../core/commands';
@@ -90,6 +90,22 @@ export class InputController {
 
   constructor(deps: InputControllerDeps) {
     this.deps = deps;
+  }
+
+  /**
+   * Reads a vault note's content so it can be inlined as <current_note>.
+   * Returns undefined if the file is missing or unreadable (caller falls back to path-only).
+   */
+  private async readCurrentNoteContent(notePath: string): Promise<string | undefined> {
+    try {
+      const file = this.deps.plugin.app.vault.getAbstractFileByPath(notePath);
+      if (file instanceof TFile) {
+        return await this.deps.plugin.app.vault.cachedRead(file);
+      }
+    } catch {
+      // ignore — fall back to sending the path only
+    }
+    return undefined;
   }
 
   // ============================================
@@ -236,7 +252,8 @@ export class InputController {
     }
 
     if (shouldSendCurrentNote && currentNotePath) {
-      promptToSend = prependCurrentNote(promptToSend, currentNotePath);
+      const noteContent = await this.readCurrentNoteContent(currentNotePath);
+      promptToSend = prependCurrentNote(promptToSend, currentNotePath, noteContent);
       currentNoteForMessage = currentNotePath;
     }
 
@@ -249,7 +266,9 @@ export class InputController {
       promptToSend = fileContextManager.transformContextMentions(promptToSend);
     }
 
-    fileContextManager?.markCurrentNoteSent();
+    fileContextManager?.markCurrentNoteSent(
+      shouldSendCurrentNote && currentNotePath ? currentNotePath : undefined,
+    );
 
     const userMsg: ChatMessage = {
       id: this.deps.generateId(),
@@ -538,11 +557,14 @@ ${content}
     }
 
     if (shouldSendCurrentNote && currentNote) {
-      promptToSend = prependCurrentNote(promptToSend, currentNote);
+      const noteContent = await this.readCurrentNoteContent(currentNote);
+      promptToSend = prependCurrentNote(promptToSend, currentNote, noteContent);
       currentNoteForMessage = currentNote;
     }
 
-    fileContextManager?.markCurrentNoteSent();
+    fileContextManager?.markCurrentNoteSent(
+      shouldSendCurrentNote && currentNote ? currentNote : undefined,
+    );
 
     if (!skipUserMessage) {
       const displayContent = options?.displayContent ?? content;

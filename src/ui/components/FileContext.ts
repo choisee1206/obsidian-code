@@ -126,15 +126,20 @@ export class FileContextManager {
     return this.currentNotePath;
   }
 
-  /** Checks whether current note should be sent for this session. */
+  /**
+   * Whether the current note should be sent with the next message.
+   * Sends whenever a note is attached/focused and differs from the last one we sent,
+   * so re-attaching or switching notes mid-conversation works (not just the first message).
+   */
   shouldSendCurrentNote(notePath?: string | null): boolean {
     const resolvedPath = notePath ?? this.currentNotePath;
-    return !!resolvedPath && !this.state.hasSentCurrentNote();
+    if (!resolvedPath) return false;
+    return resolvedPath !== this.state.getLastSentNotePath();
   }
 
-  /** Marks current note as sent (call after sending a message). */
-  markCurrentNoteSent() {
-    this.state.markCurrentNoteSent();
+  /** Marks current note as sent (call after sending a message). Defaults to the current note path. */
+  markCurrentNoteSent(path?: string | null) {
+    this.state.markCurrentNoteSent(path ?? this.currentNotePath);
   }
 
   isSessionStarted(): boolean {
@@ -164,6 +169,11 @@ export class FileContextManager {
     this.currentNotePath = notePath;
     if (notePath) {
       this.state.attachFile(notePath);
+      // When restoring into a conversation that already exchanged messages, treat the
+      // restored note as already sent so it is not re-injected on the next message.
+      if (this.state.hasSentCurrentNote()) {
+        this.state.markCurrentNoteSent(notePath);
+      }
     }
     this.refreshCurrentNoteChip();
   }
