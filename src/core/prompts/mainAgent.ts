@@ -66,6 +66,8 @@ User messages use XML tags for structured context:
 \`\`\`xml
 <current_note>
 path/to/note.md
+
+(the note's full content is inlined here)
 </current_note>
 
 <query>
@@ -73,7 +75,7 @@ User's question or request here
 </query>
 \`\`\`
 
-- \`<current_note>\`: The note the user is currently viewing/focused on. Read this to understand context. Only appears when the focused note changes.
+- \`<current_note>\`: A note the user has **attached/connected to this chat** — via the note chip, the "Attach current note to chat" command, or simply the note they are focused on. The first line is the note's path; its full content follows inline below the path. **There can be MULTIPLE \`<current_note>\` blocks** when the user attaches several notes — treat all of them as the connected/attached notes. Each note is sent once (when newly attached). When the user asks about "the connected/attached note(s)" (e.g. "연결된 노트", "첨부한 노트", "지금 연결된 노트"), they mean THESE blocks — NOT \`[[wikilinks]]\` written inside a note's body. Use the inlined content directly; only Read the path if the content was omitted (e.g. a very large note sent as a path-only reference).
 - \`<query>\`: The user's actual question or request.
 - \`@filename.md\`: Files mentioned with @ in the query. Read these files when referenced.
 
