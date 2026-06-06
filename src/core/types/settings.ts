@@ -156,10 +156,10 @@ export const DEFAULT_SETTINGS: ObsidianCodeSettings = {
   userName: '',
   enableBlocklist: true,
   blockedCommands: getDefaultBlockedCommands(),
-  model: 'haiku',
+  model: 'opus[1m]',
   enableAutoTitleGeneration: true,
   titleGenerationModel: '',  // Empty = auto (ANTHROPIC_DEFAULT_HAIKU_MODEL or claude-haiku-4-5)
-  lastClaudeModel: 'haiku',
+  lastClaudeModel: 'opus[1m]',
   lastCustomModel: '',
   lastEnvHash: '',
   thinkingBudget: 'off',

@@ -9,7 +9,9 @@ export type ClaudeModel = string;
 export const DEFAULT_CLAUDE_MODELS: { value: ClaudeModel; label: string; description: string }[] = [
   { value: 'haiku', label: 'Haiku', description: 'Claude Haiku (Latest via CLI)' },
   { value: 'sonnet', label: 'Sonnet', description: 'Claude Sonnet (Latest via CLI)' },
+  { value: 'sonnet[1m]', label: 'Sonnet 1M', description: 'Claude Sonnet with 1M context window' },
   { value: 'opus', label: 'Opus', description: 'Claude Opus (Latest via CLI)' },
+  { value: 'opus[1m]', label: 'Opus 1M', description: 'Claude Opus with 1M context window' },
 ];
 
 /** Extended thinking token budget levels. */
@@ -28,5 +30,7 @@ export const THINKING_BUDGETS: { value: ThinkingBudget; label: string; tokens: n
 export const DEFAULT_THINKING_BUDGET: Record<string, ThinkingBudget> = {
   'haiku': 'off',
   'sonnet': 'low',
+  'sonnet[1m]': 'low',
   'opus': 'medium',
+  'opus[1m]': 'medium',
 };

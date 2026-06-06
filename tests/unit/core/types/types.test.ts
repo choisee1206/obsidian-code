@@ -64,8 +64,8 @@ describe('types.ts', () => {
       expect(DEFAULT_SETTINGS.envSnippets).toEqual([]);
     });
 
-    it('should have lastClaudeModel set to haiku by default', () => {
-      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('haiku');
+    it('should have lastClaudeModel set to opus[1m] by default', () => {
+      expect(DEFAULT_SETTINGS.lastClaudeModel).toBe('opus[1m]');
     });
 
     it('should have lastCustomModel as empty string by default', () => {

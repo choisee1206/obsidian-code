@@ -344,7 +344,7 @@ export default class ObsidianCodePlugin extends Plugin {
     if (customModels.length > 0) {
       this.settings.model = this.getPreferredCustomModel(envVars, customModels);
     } else {
-      this.settings.model = DEFAULT_CLAUDE_MODELS[0].value;
+      this.settings.model = 'opus[1m]';
     }
 
     this.settings.lastEnvHash = currentHash;
