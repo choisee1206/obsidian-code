@@ -134,7 +134,12 @@ export class FileContextManager {
   shouldSendCurrentNote(notePath?: string | null): boolean {
     const resolvedPath = notePath ?? this.currentNotePath;
     if (!resolvedPath) return false;
-    return resolvedPath !== this.state.getLastSentNotePath();
+    return !this.state.hasSentNote(resolvedPath);
+  }
+
+  /** All attached/pinned note paths (the chips) so every connected note can be sent. */
+  getAttachedFiles(): string[] {
+    return [...this.state.getAttachedFiles()];
   }
 
   /** Marks current note as sent (call after sending a message). Defaults to the current note path. */

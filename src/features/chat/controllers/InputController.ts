@@ -108,6 +108,41 @@ export class InputController {
     return undefined;
   }
 
+  /**
+   * Prepends every connected note (current note + attached/pinned chips) that hasn't been
+   * sent yet, inlining each note's content. Returns the augmented prompt and the sent paths
+   * (caller marks them as sent). Lets the user attach multiple notes, not just one.
+   */
+  private async prependAttachedNotes(
+    prompt: string,
+    fileContextManager: FileContextManager | null,
+    explicitCurrentNote?: string | null,
+  ): Promise<{ prompt: string; paths: string[] }> {
+    if (!fileContextManager) return { prompt, paths: [] };
+
+    const paths: string[] = [];
+    const seen = new Set<string>();
+    const consider = (p: string | null | undefined) => {
+      if (p && !seen.has(p) && fileContextManager.shouldSendCurrentNote(p)) {
+        seen.add(p);
+        paths.push(p);
+      }
+    };
+
+    consider(explicitCurrentNote ?? fileContextManager.getCurrentNotePath());
+    for (const f of fileContextManager.getAttachedFiles?.() ?? []) {
+      consider(f);
+    }
+
+    let result = prompt;
+    // Prepend in reverse so the first considered note ends up first in the prompt.
+    for (let i = paths.length - 1; i >= 0; i--) {
+      const content = await this.readCurrentNoteContent(paths[i]);
+      result = prependCurrentNote(result, paths[i], content);
+    }
+    return { prompt: result, paths };
+  }
+
   // ============================================
   // Message Sending
   // ============================================
@@ -234,9 +269,6 @@ export class InputController {
       imageContextManager?.clearImages();
     }
 
-    const currentNotePath = fileContextManager?.getCurrentNotePath() || null;
-    const shouldSendCurrentNote = fileContextManager?.shouldSendCurrentNote(currentNotePath) ?? false;
-
     const editorContextOverride = options?.editorContextOverride;
     const editorContext = editorContextOverride !== undefined
       ? editorContextOverride
@@ -251,10 +283,10 @@ export class InputController {
       promptToSend = prependEditorContext(promptToSend, editorContext);
     }
 
-    if (shouldSendCurrentNote && currentNotePath) {
-      const noteContent = await this.readCurrentNoteContent(currentNotePath);
-      promptToSend = prependCurrentNote(promptToSend, currentNotePath, noteContent);
-      currentNoteForMessage = currentNotePath;
+    const attached = await this.prependAttachedNotes(promptToSend, fileContextManager ?? null);
+    promptToSend = attached.prompt;
+    if (attached.paths.length > 0) {
+      currentNoteForMessage = attached.paths[0];
     }
 
     if (options?.promptPrefix) {
@@ -266,9 +298,10 @@ export class InputController {
       promptToSend = fileContextManager.transformContextMentions(promptToSend);
     }
 
-    fileContextManager?.markCurrentNoteSent(
-      shouldSendCurrentNote && currentNotePath ? currentNotePath : undefined,
-    );
+    for (const p of attached.paths) {
+      fileContextManager?.markCurrentNoteSent(p);
+    }
+    fileContextManager?.markCurrentNoteSent();
 
     const userMsg: ChatMessage = {
       id: this.deps.generateId(),
@@ -530,16 +563,11 @@ export class InputController {
     }
 
     let currentNote: string | null = null;
-    let shouldSendCurrentNote = false;
     let currentNoteForMessage: string | undefined;
     if (skipUserMessage || options?.currentNote) {
       currentNote = options?.currentNote || null;
     } else {
       currentNote = fileContextManager?.getCurrentNotePath() || null;
-    }
-    shouldSendCurrentNote = fileContextManager?.shouldSendCurrentNote(currentNote) ?? false;
-    if (shouldSendCurrentNote && currentNote) {
-      currentNoteForMessage = currentNote;
     }
 
     const editorContext = options?.editorContext ?? selectionController.getContext();
@@ -556,15 +584,16 @@ ${content}
       promptToSend = prependEditorContext(promptToSend, editorContext);
     }
 
-    if (shouldSendCurrentNote && currentNote) {
-      const noteContent = await this.readCurrentNoteContent(currentNote);
-      promptToSend = prependCurrentNote(promptToSend, currentNote, noteContent);
-      currentNoteForMessage = currentNote;
+    const attached = await this.prependAttachedNotes(promptToSend, fileContextManager ?? null, currentNote);
+    promptToSend = attached.prompt;
+    if (attached.paths.length > 0) {
+      currentNoteForMessage = attached.paths[0];
     }
 
-    fileContextManager?.markCurrentNoteSent(
-      shouldSendCurrentNote && currentNote ? currentNote : undefined,
-    );
+    for (const p of attached.paths) {
+      fileContextManager?.markCurrentNoteSent(p);
+    }
+    fileContextManager?.markCurrentNoteSent();
 
     if (!skipUserMessage) {
       const displayContent = options?.displayContent ?? content;

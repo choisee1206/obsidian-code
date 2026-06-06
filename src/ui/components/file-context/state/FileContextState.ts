@@ -14,8 +14,8 @@ export class FileContextState {
   private sessionStarted = false;
   private mentionedMcpServers: Set<string> = new Set();
   private currentNoteSent = false;
-  /** Path of the note most recently sent to the agent (for change detection). */
-  private lastSentNotePath: string | null = null;
+  /** Paths of notes already sent to the agent this session (so each is sent once). */
+  private sentNotePaths: Set<string> = new Set();
   /** Maps display name (e.g., "@folder/file.ts") to absolute path for context files. */
   private contextFileMap: Map<string, string> = new Map();
 
@@ -36,16 +36,16 @@ export class FileContextState {
     return this.currentNoteSent;
   }
 
-  /** Path of the note last sent to the agent (null if none). */
-  getLastSentNotePath(): string | null {
-    return this.lastSentNotePath;
+  /** Whether the given note path has already been sent to the agent this session. */
+  hasSentNote(path: string): boolean {
+    return this.sentNotePaths.has(path);
   }
 
-  /** Marks the current note as sent. Pass the path that was actually sent to track changes. */
+  /** Marks a note as sent. Pass the path that was actually sent so it isn't re-sent. */
   markCurrentNoteSent(path?: string | null): void {
     this.currentNoteSent = true;
     if (path) {
-      this.lastSentNotePath = path;
+      this.sentNotePaths.add(path);
     }
   }
 
@@ -60,7 +60,7 @@ export class FileContextState {
   resetForNewConversation(): void {
     this.sessionStarted = false;
     this.currentNoteSent = false;
-    this.lastSentNotePath = null;
+    this.sentNotePaths.clear();
     this.attachedFiles.clear();
     this.pinnedFiles.clear();
     this.contextFileMap.clear();
@@ -69,7 +69,7 @@ export class FileContextState {
 
   resetForLoadedConversation(hasMessages: boolean): void {
     this.currentNoteSent = hasMessages;
-    this.lastSentNotePath = null;
+    this.sentNotePaths.clear();
     this.attachedFiles.clear();
     this.pinnedFiles.clear();
     this.contextFileMap.clear();
